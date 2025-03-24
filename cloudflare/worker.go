@@ -11,7 +11,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/marcus/stability-go/client"
+	"github.com/marcusziade/stability-go/client"
 )
 
 // Environment variables set by JavaScript

@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/marcus/stability-go/client"
+	"github.com/marcusziade/stability-go/client"
 )
 
 // ProxyServer is a simple proxy server for the Stability AI API

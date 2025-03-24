@@ -107,7 +107,7 @@ To use the proxy with the stability-go client:
 
 ```go
 import (
-    "github.com/marcus/stability-go"
+    "github.com/marcusziade/stability-go"
 )
 
 // Create a client with the proxy URL

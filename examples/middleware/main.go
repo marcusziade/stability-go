@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/marcus/stability-go"
-	"github.com/marcus/stability-go/client"
+	"github.com/marcusziade/stability-go"
+	"github.com/marcusziade/stability-go/client"
 )
 
 // Custom logging middleware implementation

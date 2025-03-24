@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/marcus/stability-go/client"
+	"github.com/marcusziade/stability-go/client"
 )
 
 // New creates a new Stability API client with the given API key

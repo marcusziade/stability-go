@@ -17,7 +17,7 @@ A production-ready Go client library for the Stability AI API with focus on the 
 ## Installation
 
 ```bash
-go get github.com/marcus/stability-go
+go get github.com/marcusziade/stability-go
 ```
 
 ## Quick Start
@@ -31,8 +31,8 @@ import (
     "os"
     "time"
 
-    "github.com/marcus/stability-go"
-    "github.com/marcus/stability-go/client"
+    "github.com/marcusziade/stability-go"
+    "github.com/marcusziade/stability-go/client"
 )
 
 func main() {

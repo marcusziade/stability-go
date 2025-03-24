@@ -1,4 +1,4 @@
-module github.com/marcus/stability-go
+module github.com/marcusziade/stability-go
 
 go 1.24.1
 
