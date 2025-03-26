@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/marcusziade/stability-go"
@@ -133,8 +134,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	// Create context with timeout - increased for better handling of possible content policy checks
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	// Create client with middleware if proxy is enabled
@@ -168,7 +169,22 @@ func main() {
 	
 	response, err := stClient.Upscale(ctx, request)
 	if err != nil {
-		fmt.Printf("Failed to upscale image: %v\n", err)
+		// Check if it's a content policy violation
+		if err.Error() != "" && (strings.Contains(err.Error(), "content policy violation") || 
+		   strings.Contains(err.Error(), "forbidden") ||
+		   strings.Contains(err.Error(), "no data received")) {
+			fmt.Printf("Content policy error: %v\n", err)
+			fmt.Println("This image likely violates Stability AI's content policies.")
+			fmt.Println("Please try a different image or check the image content against Stability AI's guidelines.")
+			fmt.Println("If you believe this is an error, try the 'fast' upscale type which has less stringent filters.")
+		} else if strings.Contains(err.Error(), "context deadline exceeded") || 
+		         strings.Contains(err.Error(), "timeout") {
+			fmt.Printf("Request timed out: %v\n", err)
+			fmt.Println("This may be due to a content policy check or server load.")
+			fmt.Println("For NSFW content that violates the content policy, the API may timeout instead of returning an error.")
+		} else {
+			fmt.Printf("Failed to upscale image: %v\n", err)
+		}
 		os.Exit(1)
 	}
 
@@ -182,7 +198,15 @@ func main() {
 			
 			result, finished, err := stClient.PollCreativeResult(ctx, response.CreativeID)
 			if err != nil {
-				fmt.Printf("Error polling for results: %v\n", err)
+				// Check if it's a content policy violation
+				if err.Error() != "" && (strings.Contains(err.Error(), "content policy violation") || 
+				   strings.Contains(err.Error(), "forbidden")) {
+					fmt.Printf("\nContent policy error during processing: %v\n", err)
+					fmt.Println("This may indicate that the image violates Stability AI's content policies.")
+					fmt.Println("Please try a different image or check the image content against Stability AI's guidelines.")
+				} else {
+					fmt.Printf("\nError polling for results: %v\n", err)
+				}
 				os.Exit(1)
 			}
 			

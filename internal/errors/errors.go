@@ -66,3 +66,14 @@ func IsCreditError(err error) bool {
 	}
 	return false
 }
+
+// IsContentPolicyViolation checks if the error is due to content policy violation
+func IsContentPolicyViolation(err error) bool {
+	if apiErr, ok := err.(*APIError); ok {
+		return apiErr.StatusCode == http.StatusForbidden ||
+			apiErr.Name == "content_policy_violation" ||
+			apiErr.Name == "safety_violation" ||
+			apiErr.Message == "Your request has been rejected as a result of our safety system."
+	}
+	return false
+}

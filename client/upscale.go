@@ -171,7 +171,7 @@ func (c *Client) Upscale(ctx context.Context, request UpscaleRequest) (*UpscaleR
 			} else if request.Type == UpscaleTypeCreative && (request.Creativity < 0.1 || request.Creativity > 0.5) {
 				return nil, fmt.Errorf("creativity for creative upscale must be between 0.1 and 0.5")
 			}
-			
+
 			fields["creativity"] = strconv.FormatFloat(request.Creativity, 'f', 2, 64)
 		}
 
@@ -234,7 +234,21 @@ func (c *Client) Upscale(ctx context.Context, request UpscaleRequest) (*UpscaleR
 		body, _ := io.ReadAll(resp.Body)
 		var errorResp ErrorResponse
 		if err := json.Unmarshal(body, &errorResp); err == nil {
+			// Check for content policy violation (HTTP 403)
+			if resp.StatusCode == http.StatusForbidden {
+				// Look for specific content policy error patterns
+				if errorResp.Name == "content_policy_violation" ||
+					errorResp.Name == "safety_violation" ||
+					errorResp.Message == "Your request has been rejected as a result of our safety system." {
+					return nil, fmt.Errorf("content policy violation: the image violates Stability AI's content policy - %s", errorResp.Message)
+				}
+				return nil, fmt.Errorf("forbidden: %s - %s", errorResp.Name, errorResp.Message)
+			}
 			return nil, fmt.Errorf("upscale API error (status %d): %s - %s", resp.StatusCode, errorResp.Name, errorResp.Message)
+		}
+		// Fallback for unparseable errors
+		if resp.StatusCode == http.StatusForbidden {
+			return nil, fmt.Errorf("content policy violation: the image appears to violate Stability AI's content policy")
 		}
 		return nil, fmt.Errorf("upscale API error (status %d): %s", resp.StatusCode, string(body))
 	}
@@ -251,9 +265,15 @@ func (c *Client) Upscale(ctx context.Context, request UpscaleRequest) (*UpscaleR
 	}
 
 	// For Conservative and Fast upscale, we get the image directly
-	bodyData, err := io.ReadAll(resp.Body)
+	// Add a buffer size limit to prevent excessive memory usage
+	bodyData, err := io.ReadAll(io.LimitReader(resp.Body, 100*1024*1024)) // 100MB limit
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// If no data was received but no error, it might be a silent failure or content policy violation
+	if len(bodyData) == 0 {
+		return nil, fmt.Errorf("no data received in response; this may indicate a content policy violation")
 	}
 
 	return &UpscaleResponse{
@@ -284,7 +304,21 @@ func (c *Client) PollCreativeResult(ctx context.Context, id string) (*UpscaleRes
 		body, _ := io.ReadAll(resp.Body)
 		var errorResp ErrorResponse
 		if err := json.Unmarshal(body, &errorResp); err == nil {
+			// Check for content policy violation (HTTP 403)
+			if resp.StatusCode == http.StatusForbidden {
+				// Look for specific content policy error patterns
+				if errorResp.Name == "content_policy_violation" ||
+					errorResp.Name == "safety_violation" ||
+					errorResp.Message == "Your request has been rejected as a result of our safety system." {
+					return nil, false, fmt.Errorf("content policy violation: the image violates Stability AI's content policy - %s", errorResp.Message)
+				}
+				return nil, false, fmt.Errorf("forbidden: %s - %s", errorResp.Name, errorResp.Message)
+			}
 			return nil, false, fmt.Errorf("poll API error (status %d): %s - %s", resp.StatusCode, errorResp.Name, errorResp.Message)
+		}
+		// Fallback for unparseable errors
+		if resp.StatusCode == http.StatusForbidden {
+			return nil, false, fmt.Errorf("content policy violation: the image appears to violate Stability AI's content policy")
 		}
 		return nil, false, fmt.Errorf("poll API error (status %d): %s", resp.StatusCode, string(body))
 	}
@@ -315,5 +349,3 @@ func (c *Client) PollCreativeResult(ctx context.Context, id string) (*UpscaleRes
 		MimeType:  resultResp.Type,
 	}, true, nil
 }
-
-

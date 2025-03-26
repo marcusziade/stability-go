@@ -13,7 +13,7 @@ import (
 
 const (
 	DefaultBaseURL = "https://api.stability.ai"
-	DefaultTimeout = 30 * time.Second
+	DefaultTimeout = 90 * time.Second
 )
 
 // Client represents a Stability AI API client
