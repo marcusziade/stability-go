@@ -200,6 +200,15 @@ func WithAppIDAuth(allowedAppIDs []string) Middleware {
 				return
 			}
 			
+			// Skip app ID check for the following paths:
+			// - Root path (landing page)
+			// - Health endpoint
+			// - API documentation
+			if r.URL.Path == "/" || r.URL.Path == "/health" || r.URL.Path == "/api/docs" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			
 			// Get App ID from header
 			appID := r.Header.Get("X-App-ID")
 			if appID == "" {
