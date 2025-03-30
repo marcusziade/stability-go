@@ -57,6 +57,7 @@ func New(client *client.Client, logger *logger.Logger, cachePath string, rateLim
 	mux := http.NewServeMux()
 
 	// Register routes with middleware
+	mux.Handle("/", http.HandlerFunc(s.handleRoot))
 	mux.Handle("/api/v1/upscale", WithAuth(apiKey, nil)(http.HandlerFunc(s.handleUpscale)))
 	mux.Handle("/api/v1/upscale/result/", WithAuth(apiKey, nil)(http.HandlerFunc(s.handleUpscaleResult)))
 	mux.Handle("/health", http.HandlerFunc(s.handleHealthCheck))
@@ -659,4 +660,144 @@ func generateCacheKey(imageData []byte, formData map[string][]string) string {
 // encodeBase64 encodes data as base64
 func encodeBase64(data []byte) string {
 	return hex.EncodeToString(data)
+}
+
+// handleRoot serves the landing page with API documentation
+func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
+	// Only allow GET requests
+	if r.Method != http.MethodGet {
+		s.sendError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// If requesting the root path exactly, serve HTML
+	if r.URL.Path == "/" {
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
+		
+		html := `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stability AI Upscale API</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3 {
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .endpoint {
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .method {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        .get {
+            background-color: #61affe;
+            color: white;
+        }
+        .post {
+            background-color: #49cc90;
+            color: white;
+        }
+        .url {
+            font-family: monospace;
+            font-size: 1.1em;
+        }
+    </style>
+</head>
+<body>
+    <h1>Stability AI Upscale API</h1>
+    <p>A REST API service for upscaling images using Stability AI's API.</p>
+    
+    <h2>API Overview</h2>
+    <p>This API provides endpoints for upscaling images using various methods provided by Stability AI.</p>
+    
+    <h3>Available Endpoints:</h3>
+    
+    <div class="endpoint">
+        <h4>
+            <span class="method post">POST</span>
+            <span class="url">/api/v1/upscale</span>
+        </h4>
+        <p>Upscale an image using Stability AI's upscaling API.</p>
+        <p>Supports fast, conservative, and creative upscaling types.</p>
+        <p><a href="/api/docs" target="_blank">See API documentation for details</a></p>
+    </div>
+    
+    <div class="endpoint">
+        <h4>
+            <span class="method get">GET</span>
+            <span class="url">/api/v1/upscale/result/{id}</span>
+        </h4>
+        <p>Poll for the result of a creative upscale request.</p>
+        <p><a href="/api/docs" target="_blank">See API documentation for details</a></p>
+    </div>
+    
+    <div class="endpoint">
+        <h4>
+            <span class="method get">GET</span>
+            <span class="url">/health</span>
+        </h4>
+        <p>Check the health status of the API.</p>
+    </div>
+    
+    <div class="endpoint">
+        <h4>
+            <span class="method get">GET</span>
+            <span class="url">/api/docs</span>
+        </h4>
+        <p>View the OpenAPI specification for this API.</p>
+    </div>
+    
+    <h2>Authentication</h2>
+    <p>All API endpoints require authentication using a bearer token. Include your API key in the Authorization header:</p>
+    <pre>Authorization: Bearer your_api_key_here</pre>
+    
+    <h2>Example Usage</h2>
+    <p>Example of upscaling an image using the fast method:</p>
+    <pre>curl -X POST https://stability-go.fly.dev/api/v1/upscale \
+-H "Authorization: Bearer your_api_key_here" \
+-F "image=@path/to/image.jpg" \
+-F "type=fast"</pre>
+    
+    <p>For more examples and full documentation, see the <a href="/api/docs">API documentation</a>.</p>
+    
+    <h2>GitHub Repository</h2>
+    <p><a href="https://github.com/marcusziade/stability-go" target="_blank">https://github.com/marcusziade/stability-go</a></p>
+</body>
+</html>`
+		
+		w.Write([]byte(html))
+		return
+	}
+	
+	// Otherwise return 404
+	s.sendError(w, "Not found", http.StatusNotFound)
 }

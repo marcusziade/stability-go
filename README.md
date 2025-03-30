@@ -2,6 +2,13 @@
 
 A production-ready Go client library and REST API server for the Stability AI API, with a focus on the Upscale services. The library provides a clean, idiomatic Go interface to the Stability AI API with middleware support for rate limiting, retries, and proxying.
 
+## Hosted API
+
+The API is hosted and publicly available at:
+[https://stability-go.fly.dev](https://stability-go.fly.dev)
+
+Visit the hosted API for documentation and examples on how to interact with the service.
+
 ## Features
 
 - Full support for Stability AI's upscale API endpoints
@@ -138,7 +145,19 @@ See the `examples` directory for complete examples of using the library:
 
 ## Using the REST API Server
 
-This package includes a full-featured REST API server for the Stability AI Upscale API. You can run it directly from source or use the provided Docker image.
+This package includes a full-featured REST API server for the Stability AI Upscale API. You can run it directly from source, use the provided Docker image, or deploy to Fly.io.
+
+### Deploying to Fly.io
+
+The easiest way to deploy this API is using Fly.io. See the [DEPLOY.md](DEPLOY.md) file for detailed deployment instructions.
+
+```bash
+# Follow these steps:
+fly auth login
+fly launch --name stability-go
+fly secrets set STABILITY_API_KEY=your_api_key_here
+fly deploy
+```
 
 ### Running with Docker
 
@@ -178,12 +197,13 @@ export CACHE_PATH="./cache"
 
 The REST API server provides the following endpoints:
 
+- `GET /` - Landing page with API overview and documentation
 - `POST /api/v1/upscale` - Upscale an image
 - `GET /api/v1/upscale/result/{id}` - Get the result of a creative upscale
 - `GET /health` - Health check endpoint
 - `GET /api/docs` - API documentation (OpenAPI format)
 
-See the API documentation at `GET /api/docs` for more details on how to use the API.
+The hosted API is available at https://stability-go.fly.dev/. Visit the root URL for an interactive documentation page or access the OpenAPI specification at https://stability-go.fly.dev/api/docs.
 
 ### Environment Variables
 
