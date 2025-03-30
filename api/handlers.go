@@ -736,10 +736,7 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
     <h1>Stability AI Upscale API</h1>
     <p>A REST API service for upscaling images using Stability AI's API.</p>
     
-    <h2>API Overview</h2>
-    <p>This API provides endpoints for upscaling images using various methods provided by Stability AI.</p>
-    
-    <h3>Available Endpoints:</h3>
+    <h2>API Endpoints</h2>
     
     <div class="endpoint">
         <h4>
@@ -748,7 +745,20 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
         </h4>
         <p>Upscale an image using Stability AI's upscaling API.</p>
         <p>Supports fast, conservative, and creative upscaling types.</p>
-        <p><a href="/api/docs" target="_blank">See API documentation for details</a></p>
+        <p>Required parameters:</p>
+        <ul>
+            <li><code>image</code>: The image file to upscale (multipart/form-data)</li>
+        </ul>
+        <p>Optional parameters:</p>
+        <ul>
+            <li><code>type</code>: Upscale type - "fast", "conservative", or "creative" (default: "fast")</li>
+            <li><code>prompt</code>: Text prompt to guide upscaling (required for "conservative" and "creative" types)</li>
+            <li><code>negative_prompt</code>: Negative prompt to guide upscaling</li>
+            <li><code>seed</code>: Seed for consistent results</li>
+            <li><code>creativity</code>: Creativity level (0.1-0.5)</li>
+            <li><code>output_format</code>: Output format - "png", "jpeg", or "webp" (default: "png")</li>
+            <li><code>style_preset</code>: Style preset for creative upscaling (e.g., "enhance", "anime", "photographic")</li>
+        </ul>
     </div>
     
     <div class="endpoint">
@@ -757,7 +767,7 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
             <span class="url">/api/v1/upscale/result/{id}</span>
         </h4>
         <p>Poll for the result of a creative upscale request.</p>
-        <p><a href="/api/docs" target="_blank">See API documentation for details</a></p>
+        <p>Replace <code>{id}</code> with the ID returned from a creative upscale request.</p>
     </div>
     
     <div class="endpoint">
@@ -768,16 +778,8 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
         <p>Check the health status of the API.</p>
     </div>
     
-    <div class="endpoint">
-        <h4>
-            <span class="method get">GET</span>
-            <span class="url">/api/docs</span>
-        </h4>
-        <p>View the OpenAPI specification for this API.</p>
-    </div>
-    
     <h2>Authentication</h2>
-    <p>All API endpoints require authentication using a bearer token. Include your API key in the Authorization header:</p>
+    <p>All API endpoints (except /health) require authentication using a bearer token. Include your API key in the Authorization header:</p>
     <pre>Authorization: Bearer your_api_key_here</pre>
     
     <h2>Example Usage</h2>
@@ -786,8 +788,17 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 -H "Authorization: Bearer your_api_key_here" \
 -F "image=@path/to/image.jpg" \
 -F "type=fast"</pre>
-    
-    <p>For more examples and full documentation, see the <a href="/api/docs">API documentation</a>.</p>
+
+    <p>Example of creative upscaling (returns an ID for polling):</p>
+    <pre>curl -X POST https://stability-go.fly.dev/api/v1/upscale \
+-H "Authorization: Bearer your_api_key_here" \
+-F "image=@path/to/image.jpg" \
+-F "type=creative" \
+-F "prompt=high quality detailed fantasy landscape"</pre>
+
+    <p>Polling for a creative upscale result:</p>
+    <pre>curl -X GET https://stability-go.fly.dev/api/v1/upscale/result/your_id_here \
+-H "Authorization: Bearer your_api_key_here"</pre>
     
     <h2>GitHub Repository</h2>
     <p><a href="https://github.com/marcusziade/stability-go" target="_blank">https://github.com/marcusziade/stability-go</a></p>

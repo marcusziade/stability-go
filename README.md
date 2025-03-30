@@ -203,7 +203,7 @@ The REST API server provides the following endpoints:
 - `GET /health` - Health check endpoint
 - `GET /api/docs` - API documentation (OpenAPI format)
 
-The hosted API is available at https://stability-go.fly.dev/. Visit the root URL for an interactive documentation page or access the OpenAPI specification at https://stability-go.fly.dev/api/docs.
+The hosted API is available at https://stability-go.fly.dev/. Visit the root URL for an interactive documentation page with examples and endpoint details.
 
 ### Environment Variables
 
