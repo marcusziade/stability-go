@@ -74,7 +74,7 @@ func New(client *client.Client, logger *logger.Logger, cachePath string, rateLim
 		WithLogger(logger),
 		WithCORS(nil), // Allow all origins
 		WithIPFilter(s.AllowedIPs),
-		WithAppIDAuth(s.AllowedAppIDs)
+		WithAppIDAuth(s.AllowedAppIDs),
 	)(mux)
 
 	// Create cache directory if it doesn't exist
