@@ -54,10 +54,10 @@ func main() {
 
     // Create upscale request
     request := client.UpscaleRequest{
-        Image:    imageData,
-        Filename: "input.jpg",
-        Model:    client.UpscaleModelESRGAN,
-        Factor:   2,
+        Image:        imageData,
+        Filename:     "input.jpg",
+        Type:         client.UpscaleTypeFast,
+        OutputFormat: client.OutputFormatPNG,
     }
 
     // Make the request
@@ -70,12 +70,13 @@ func main() {
         os.Exit(1)
     }
 
-    // Process the response (first artifact)
-    if len(response.Artifacts) > 0 {
-        artifact := response.Artifacts[0]
-        // ... handle the upscaled image (e.g., save to disk)
-        fmt.Println("Successfully upscaled image")
+    // Save the upscaled image
+    if err := os.WriteFile("output.png", response.ImageData, 0644); err != nil {
+        fmt.Printf("Failed to save upscaled image: %v\n", err)
+        os.Exit(1)
     }
+
+    fmt.Println("Successfully upscaled and saved image to output.png")
 }
 ```
 
@@ -93,13 +94,13 @@ stClient := stability.NewWithMiddleware(apiKey,
 response, err := stClient.Upscale(ctx, request)
 ```
 
-## Available Upscale Models
+## Upscale Types
 
-The library supports all of Stability AI's upscale models:
+The library supports all of Stability AI's upscale types:
 
-- `client.UpscaleModelESRGAN` (esrgan-v1-x2plus) - Standard upscaler
-- `client.UpscaleModelStable` (stable-diffusion-x4-latent-upscaler) - Better for Stable Diffusion generated images
-- `client.UpscaleModelRealESR` (realesrgan-16x) - High quality upscaler
+- `client.UpscaleTypeFast` - Quick upscaling with good quality
+- `client.UpscaleTypeConservative` - Preserves details with guidance from a prompt
+- `client.UpscaleTypeCreative` - Adds details based on the provided prompt
 
 ## Error Handling
 
@@ -135,6 +136,68 @@ See the `examples` directory for complete examples of using the library:
 - `examples/middleware/main.go` - Example using middleware for logging, rate limiting, and retries
 - `examples/proxy-server/main.go` - Example REST API server that proxies requests to Stability AI
 
+## Using the REST API Server
+
+This package includes a full-featured REST API server for the Stability AI Upscale API. You can run it directly from source or use the provided Docker image.
+
+### Running with Docker
+
+```bash
+# Clone the repository
+git clone https://github.com/marcusziade/stability-go.git
+cd stability-go
+
+# Set your Stability AI API key
+export STABILITY_API_KEY="your-api-key-here"
+
+# Run with Docker Compose
+docker-compose up -d
+```
+
+### Running from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/marcusziade/stability-go.git
+cd stability-go
+
+# Build the server
+go build -o stability-server ./cmd/server
+
+# Set environment variables
+export STABILITY_API_KEY="your-api-key-here"
+export SERVER_ADDR=":8080"
+export LOG_LEVEL="info"
+export CACHE_PATH="./cache"
+
+# Run the server
+./stability-server
+```
+
+### API Endpoints
+
+The REST API server provides the following endpoints:
+
+- `POST /api/v1/upscale` - Upscale an image
+- `GET /api/v1/upscale/result/{id}` - Get the result of a creative upscale
+- `GET /health` - Health check endpoint
+- `GET /api/docs` - API documentation (OpenAPI format)
+
+See the API documentation at `GET /api/docs` for more details on how to use the API.
+
+### Environment Variables
+
+The server can be configured using the following environment variables:
+
+| Name | Description | Default |
+| ---- | ----------- | ------- |
+| `STABILITY_API_KEY` | Your Stability AI API key (required) | - |
+| `SERVER_ADDR` | The address to listen on | `:8080` |
+| `CACHE_PATH` | Directory to cache responses (empty to disable) | - |
+| `RATE_LIMIT` | Rate limit between requests (e.g., `500ms`) | `500ms` |
+| `ALLOWED_HOSTS` | Comma-separated list of allowed hosts | - |
+| `LOG_LEVEL` | Log level (debug, info, warn, error) | `info` |
+| `STABILITY_BASE_URL` | Custom base URL for Stability API | - |
 
 ## Contributing
 
