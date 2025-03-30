@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -24,6 +25,10 @@ type Config struct {
 	LogLevel string
 	// Custom base URL for Stability API (optional)
 	StabilityBaseURL string
+	// List of allowed IP addresses (empty to allow all)
+	AllowedIPs []string
+	// List of allowed app IDs (empty to allow all)
+	AllowedAppIDs []string
 }
 
 // LoadFromEnv loads configuration from environment variables
@@ -65,6 +70,22 @@ func LoadFromEnv() (*Config, error) {
 	if hosts := os.Getenv("ALLOWED_HOSTS"); hosts != "" {
 		allowedHosts = append(allowedHosts, hosts)
 	}
+	
+	// Parse allowed IPs (comma-separated list)
+	var allowedIPs []string
+	if ips := os.Getenv("ALLOWED_IPS"); ips != "" {
+		for _, ip := range strings.Split(ips, ",") {
+			allowedIPs = append(allowedIPs, strings.TrimSpace(ip))
+		}
+	}
+	
+	// Parse allowed app IDs (comma-separated list)
+	var allowedAppIDs []string
+	if appIDs := os.Getenv("ALLOWED_APP_IDS"); appIDs != "" {
+		for _, appID := range strings.Split(appIDs, ",") {
+			allowedAppIDs = append(allowedAppIDs, strings.TrimSpace(appID))
+		}
+	}
 
 	// Get log level
 	logLevel := os.Getenv("LOG_LEVEL")
@@ -84,6 +105,8 @@ func LoadFromEnv() (*Config, error) {
 		AllowedHosts:     allowedHosts,
 		LogLevel:         logLevel,
 		StabilityBaseURL: stabilityBaseURL,
+		AllowedIPs:       allowedIPs,
+		AllowedAppIDs:    allowedAppIDs,
 	}, nil
 }
 

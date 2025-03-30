@@ -20,9 +20,15 @@ Follow these steps to deploy the stability-go service on Fly.io:
    
    # Set a client API key for your applications to use (optional but recommended)
    fly secrets set CLIENT_API_KEY=your_client_api_key_here
+   
+   # Set allowed IP addresses for additional security (optional)
+   fly secrets set ALLOWED_IPS=1.2.3.4,5.6.7.8
+   
+   # Set allowed app IDs for additional security (optional)
+   fly secrets set ALLOWED_APP_IDS=ios-app-1,android-app-2
    ```
    
-   Note: If you don't set a CLIENT_API_KEY, one will be automatically generated and displayed in the logs on startup.
+   Note: If you don't set a CLIENT_API_KEY, one will be automatically generated and displayed in the logs on startup. For maximum security, configure both ALLOWED_IPS and ALLOWED_APP_IDS.
 
 4. Deploy the application:
    ```

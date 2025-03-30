@@ -19,14 +19,16 @@ import (
 
 // Server represents the API server
 type Server struct {
-	Router       http.Handler
-	Client       *client.Client
-	Logger       *logger.Logger
-	CachePath    string
-	RateLimit    time.Duration
-	APIKey       string
-	ClientAPIKey string
-	AllowedHost  []string
+	Router        http.Handler
+	Client        *client.Client
+	Logger        *logger.Logger
+	CachePath     string
+	RateLimit     time.Duration
+	APIKey        string
+	ClientAPIKey  string
+	AllowedHost   []string
+	AllowedIPs    []string
+	AllowedAppIDs []string
 }
 
 // Response is the standard JSON response format
@@ -44,15 +46,17 @@ type UpscaleResponse struct {
 }
 
 // New creates a new API server
-func New(client *client.Client, logger *logger.Logger, cachePath string, rateLimit time.Duration, apiKey string, clientAPIKey string, allowedHosts []string) *Server {
+func New(client *client.Client, logger *logger.Logger, cachePath string, rateLimit time.Duration, apiKey string, clientAPIKey string, allowedHosts []string, allowedIPs []string, allowedAppIDs []string) *Server {
 	s := &Server{
-		Client:       client,
-		Logger:       logger,
-		CachePath:    cachePath,
-		RateLimit:    rateLimit,
-		APIKey:       apiKey,
-		ClientAPIKey: clientAPIKey,
-		AllowedHost:  allowedHosts,
+		Client:        client,
+		Logger:        logger,
+		CachePath:     cachePath,
+		RateLimit:     rateLimit,
+		APIKey:        apiKey,
+		ClientAPIKey:  clientAPIKey,
+		AllowedHost:   allowedHosts,
+		AllowedIPs:    allowedIPs,
+		AllowedAppIDs: allowedAppIDs,
 	}
 
 	// Create the router
@@ -69,6 +73,8 @@ func New(client *client.Client, logger *logger.Logger, cachePath string, rateLim
 	s.Router = Chain(
 		WithLogger(logger),
 		WithCORS(nil), // Allow all origins
+		WithIPFilter(s.AllowedIPs),
+		WithAppIDAuth(s.AllowedAppIDs)
 	)(mux)
 
 	// Create cache directory if it doesn't exist
@@ -780,28 +786,44 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
         <p>Check the health status of the API.</p>
     </div>
     
-    <h2>Authentication</h2>
+    <h2>Authentication & Security</h2>
+    <p>This API implements multiple layers of security:</p>
+    
+    <h3>1. API Key Authentication</h3>
     <p>All API endpoints (except /health) require authentication using a bearer token. Include the client API key in the Authorization header:</p>
     <pre>Authorization: Bearer your_client_api_key</pre>
     <p>Note: This client API key is different from the Stability AI API key. The Stability AI key is kept secure on the server.</p>
+    
+    <h3>2. App ID Authentication</h3>
+    <p>If configured, each request must include an approved App ID in the X-App-ID header:</p>
+    <pre>X-App-ID: your_approved_app_id</pre>
+    
+    <h3>3. IP Address Filtering</h3>
+    <p>The server can be configured to only accept requests from specific IP addresses.</p>
+    
+    <h3>4. Rate Limiting</h3>
+    <p>The API implements rate limiting to prevent abuse.</p>
     
     <h2>Example Usage</h2>
     <p>Example of upscaling an image using the fast method:</p>
     <pre>curl -X POST https://stability-go.fly.dev/api/v1/upscale \
 -H "Authorization: Bearer your_client_api_key" \
+-H "X-App-ID: your_app_id" \
 -F "image=@path/to/image.jpg" \
 -F "type=fast"</pre>
 
     <p>Example of creative upscaling (returns an ID for polling):</p>
     <pre>curl -X POST https://stability-go.fly.dev/api/v1/upscale \
 -H "Authorization: Bearer your_client_api_key" \
+-H "X-App-ID: your_app_id" \
 -F "image=@path/to/image.jpg" \
 -F "type=creative" \
 -F "prompt=high quality detailed fantasy landscape"</pre>
 
     <p>Polling for a creative upscale result:</p>
     <pre>curl -X GET https://stability-go.fly.dev/api/v1/upscale/result/your_id_here \
--H "Authorization: Bearer your_client_api_key"</pre>
+-H "Authorization: Bearer your_client_api_key" \
+-H "X-App-ID: your_app_id"</pre>
     
     <h2>GitHub Repository</h2>
     <p><a href="https://github.com/marcusziade/stability-go" target="_blank">https://github.com/marcusziade/stability-go</a></p>

@@ -207,12 +207,29 @@ The hosted API is available at https://stability-go.fly.dev/. Visit the root URL
 
 ### Securing Your Stability AI API Key
 
-This API server is designed with a two-tier authentication system:
+This API server is designed with multiple layers of security:
 
 1. **Stability AI API Key**: Stored securely on the server and never exposed to clients
 2. **Client API Key**: A separate key used by clients to authenticate with your API server
+3. **IP Address Filtering**: Restrict access to specific IP addresses
+4. **App ID Authentication**: Require a specific App ID for each of your applications
+5. **Rate Limiting**: Protect against abuse with configurable rate limits
 
-This approach keeps your valuable Stability AI API key secure while still allowing your native clients to access the API functionality. Simply set a `CLIENT_API_KEY` environment variable or let the server generate one for you on startup.
+This multi-layer approach keeps your valuable Stability AI API key secure while still allowing your authorized clients to access the API functionality. You can configure each layer as needed:
+
+- Set `CLIENT_API_KEY` for basic authentication
+- Set `ALLOWED_IPS` to restrict access to specific IP addresses (comma-separated)
+- Set `ALLOWED_APP_IDS` to authorize specific applications (comma-separated)
+
+For example, in your native iOS app you would:
+1. Include your client API key in your app (more secure than the Stability AI key)
+2. Set a unique App ID in the `X-App-ID` header with each request
+3. Optionally restrict API access to your server's IP address
+
+This way, even if someone extracts your client API key, they would also need to:
+- Have an allowed IP address
+- Know your App ID
+- Work within your rate limits
 
 ### Environment Variables
 
@@ -226,6 +243,8 @@ The server can be configured using the following environment variables:
 | `CACHE_PATH` | Directory to cache responses (empty to disable) | - |
 | `RATE_LIMIT` | Rate limit between requests (e.g., `500ms`) | `500ms` |
 | `ALLOWED_HOSTS` | Comma-separated list of allowed hosts | - |
+| `ALLOWED_IPS` | Comma-separated list of allowed IP addresses | - |
+| `ALLOWED_APP_IDS` | Comma-separated list of allowed application IDs | - |
 | `LOG_LEVEL` | Log level (debug, info, warn, error) | `info` |
 | `STABILITY_BASE_URL` | Custom base URL for Stability API | - |
 

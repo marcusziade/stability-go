@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -156,6 +157,76 @@ func WithAuth(apiKey string, excludePaths []string) Middleware {
 	}
 }
 
+// WithIPFilter restricts access to allowed IP addresses
+func WithIPFilter(allowedIPs []string) Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Skip check if no IPs are specified (allow all)
+			if len(allowedIPs) == 0 {
+				next.ServeHTTP(w, r)
+				return
+			}
+			
+			// Get client IP
+			clientIP := getClientIP(r)
+			
+			// Check if the IP is allowed
+			allowed := false
+			for _, ip := range allowedIPs {
+				if ip == clientIP {
+					allowed = true
+					break
+				}
+			}
+			
+			if !allowed {
+				http.Error(w, "Forbidden: IP address not allowed", http.StatusForbidden)
+				return
+			}
+			
+			// Process the request
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// WithAppIDAuth validates the App-ID header
+func WithAppIDAuth(allowedAppIDs []string) Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Skip check if no app IDs are specified (allow all)
+			if len(allowedAppIDs) == 0 {
+				next.ServeHTTP(w, r)
+				return
+			}
+			
+			// Get App ID from header
+			appID := r.Header.Get("X-App-ID")
+			if appID == "" {
+				http.Error(w, "Forbidden: App ID is required", http.StatusForbidden)
+				return
+			}
+			
+			// Check if the App ID is allowed
+			allowed := false
+			for _, id := range allowedAppIDs {
+				if id == appID {
+					allowed = true
+					break
+				}
+			}
+			
+			if !allowed {
+				http.Error(w, "Forbidden: Invalid App ID", http.StatusForbidden)
+				return
+			}
+			
+			// Process the request
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // Helper functions and types
 
 // captureResponseWriter captures the status code of the response
@@ -174,6 +245,32 @@ func (crw *captureResponseWriter) WriteHeader(code int) {
 func generateRequestID() string {
 	// Simple implementation: use current timestamp
 	return time.Now().Format("20060102.150405.000000")
+}
+
+// getClientIP extracts the client's IP address from the request
+func getClientIP(r *http.Request) string {
+	// Check for X-Forwarded-For header first (for proxies)
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip != "" {
+		// X-Forwarded-For can contain multiple IPs - use the first one
+		parts := strings.Split(ip, ",")
+		return strings.TrimSpace(parts[0])
+	}
+	
+	// Check for X-Real-IP header (set by some proxies)
+	ip = r.Header.Get("X-Real-IP")
+	if ip != "" {
+		return ip
+	}
+	
+	// Fall back to RemoteAddr
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		// If there's an error, just return the RemoteAddr as is
+		return r.RemoteAddr
+	}
+	
+	return ip
 }
 
 // Context keys
