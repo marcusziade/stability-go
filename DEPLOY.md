@@ -13,10 +13,16 @@ Follow these steps to deploy the stability-go service on Fly.io:
    ```
    (This will use the existing fly.toml configuration)
 
-3. Set your Stability API key as a secret:
+3. Set your secrets:
    ```
+   # Set your Stability API key (required)
    fly secrets set STABILITY_API_KEY=your_api_key_here
+   
+   # Set a client API key for your applications to use (optional but recommended)
+   fly secrets set CLIENT_API_KEY=your_client_api_key_here
    ```
+   
+   Note: If you don't set a CLIENT_API_KEY, one will be automatically generated and displayed in the logs on startup.
 
 4. Deploy the application:
    ```

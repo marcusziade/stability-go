@@ -205,6 +205,15 @@ The REST API server provides the following endpoints:
 
 The hosted API is available at https://stability-go.fly.dev/. Visit the root URL for an interactive documentation page with examples and endpoint details.
 
+### Securing Your Stability AI API Key
+
+This API server is designed with a two-tier authentication system:
+
+1. **Stability AI API Key**: Stored securely on the server and never exposed to clients
+2. **Client API Key**: A separate key used by clients to authenticate with your API server
+
+This approach keeps your valuable Stability AI API key secure while still allowing your native clients to access the API functionality. Simply set a `CLIENT_API_KEY` environment variable or let the server generate one for you on startup.
+
 ### Environment Variables
 
 The server can be configured using the following environment variables:
@@ -212,6 +221,7 @@ The server can be configured using the following environment variables:
 | Name | Description | Default |
 | ---- | ----------- | ------- |
 | `STABILITY_API_KEY` | Your Stability AI API key (required) | - |
+| `CLIENT_API_KEY` | API key for client authentication (auto-generated if not provided) | - |
 | `SERVER_ADDR` | The address to listen on | `:8080` |
 | `CACHE_PATH` | Directory to cache responses (empty to disable) | - |
 | `RATE_LIMIT` | Rate limit between requests (e.g., `500ms`) | `500ms` |

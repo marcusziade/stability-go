@@ -37,7 +37,7 @@ func main() {
 	}
 
 	// Create API server
-	server := api.New(client, log, cfg.CachePath, cfg.RateLimit, cfg.APIKey, cfg.AllowedHosts)
+	server := api.New(client, log, cfg.CachePath, cfg.RateLimit, cfg.APIKey, cfg.ClientAPIKey, cfg.AllowedHosts)
 
 	// Handle graceful shutdown
 	go handleSignals(log)

@@ -19,13 +19,14 @@ import (
 
 // Server represents the API server
 type Server struct {
-	Router      http.Handler
-	Client      *client.Client
-	Logger      *logger.Logger
-	CachePath   string
-	RateLimit   time.Duration
-	APIKey      string
-	AllowedHost []string
+	Router       http.Handler
+	Client       *client.Client
+	Logger       *logger.Logger
+	CachePath    string
+	RateLimit    time.Duration
+	APIKey       string
+	ClientAPIKey string
+	AllowedHost  []string
 }
 
 // Response is the standard JSON response format
@@ -43,14 +44,15 @@ type UpscaleResponse struct {
 }
 
 // New creates a new API server
-func New(client *client.Client, logger *logger.Logger, cachePath string, rateLimit time.Duration, apiKey string, allowedHosts []string) *Server {
+func New(client *client.Client, logger *logger.Logger, cachePath string, rateLimit time.Duration, apiKey string, clientAPIKey string, allowedHosts []string) *Server {
 	s := &Server{
-		Client:      client,
-		Logger:      logger,
-		CachePath:   cachePath,
-		RateLimit:   rateLimit,
-		APIKey:      apiKey,
-		AllowedHost: allowedHosts,
+		Client:       client,
+		Logger:       logger,
+		CachePath:    cachePath,
+		RateLimit:    rateLimit,
+		APIKey:       apiKey,
+		ClientAPIKey: clientAPIKey,
+		AllowedHost:  allowedHosts,
 	}
 
 	// Create the router
@@ -58,8 +60,8 @@ func New(client *client.Client, logger *logger.Logger, cachePath string, rateLim
 
 	// Register routes with middleware
 	mux.Handle("/", http.HandlerFunc(s.handleRoot))
-	mux.Handle("/api/v1/upscale", WithAuth(apiKey, nil)(http.HandlerFunc(s.handleUpscale)))
-	mux.Handle("/api/v1/upscale/result/", WithAuth(apiKey, nil)(http.HandlerFunc(s.handleUpscaleResult)))
+	mux.Handle("/api/v1/upscale", WithAuth(clientAPIKey, nil)(http.HandlerFunc(s.handleUpscale)))
+	mux.Handle("/api/v1/upscale/result/", WithAuth(clientAPIKey, nil)(http.HandlerFunc(s.handleUpscaleResult)))
 	mux.Handle("/health", http.HandlerFunc(s.handleHealthCheck))
 	mux.Handle("/api/docs", http.HandlerFunc(s.handleDocs))
 
@@ -779,26 +781,27 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
     </div>
     
     <h2>Authentication</h2>
-    <p>All API endpoints (except /health) require authentication using a bearer token. Include your API key in the Authorization header:</p>
-    <pre>Authorization: Bearer your_api_key_here</pre>
+    <p>All API endpoints (except /health) require authentication using a bearer token. Include the client API key in the Authorization header:</p>
+    <pre>Authorization: Bearer your_client_api_key</pre>
+    <p>Note: This client API key is different from the Stability AI API key. The Stability AI key is kept secure on the server.</p>
     
     <h2>Example Usage</h2>
     <p>Example of upscaling an image using the fast method:</p>
     <pre>curl -X POST https://stability-go.fly.dev/api/v1/upscale \
--H "Authorization: Bearer your_api_key_here" \
+-H "Authorization: Bearer your_client_api_key" \
 -F "image=@path/to/image.jpg" \
 -F "type=fast"</pre>
 
     <p>Example of creative upscaling (returns an ID for polling):</p>
     <pre>curl -X POST https://stability-go.fly.dev/api/v1/upscale \
--H "Authorization: Bearer your_api_key_here" \
+-H "Authorization: Bearer your_client_api_key" \
 -F "image=@path/to/image.jpg" \
 -F "type=creative" \
 -F "prompt=high quality detailed fantasy landscape"</pre>
 
     <p>Polling for a creative upscale result:</p>
     <pre>curl -X GET https://stability-go.fly.dev/api/v1/upscale/result/your_id_here \
--H "Authorization: Bearer your_api_key_here"</pre>
+-H "Authorization: Bearer your_client_api_key"</pre>
     
     <h2>GitHub Repository</h2>
     <p><a href="https://github.com/marcusziade/stability-go" target="_blank">https://github.com/marcusziade/stability-go</a></p>
