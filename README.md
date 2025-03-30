@@ -1,6 +1,6 @@
 # Stability Go Client
 
-A production-ready Go client library for the Stability AI API with focus on the Upscale services. The library provides a clean, idiomatic Go interface to the Stability AI API with middleware support for rate limiting, retries, and proxying.
+A production-ready Go client library and REST API server for the Stability AI API, with a focus on the Upscale services. The library provides a clean, idiomatic Go interface to the Stability AI API with middleware support for rate limiting, retries, and proxying.
 
 ## Features
 
@@ -9,7 +9,6 @@ A production-ready Go client library for the Stability AI API with focus on the 
 - Rate limiting middleware to avoid API rate limit errors
 - Retry middleware with exponential backoff and jitter
 - Proxy middleware for routing requests through a proxy server
-- WebAssembly (WASM) support for Cloudflare Workers
 - Comprehensive error handling
 - Concurrent-safe
 - Easy-to-use interface with fluent API design
@@ -133,33 +132,9 @@ if err != nil {
 See the `examples` directory for complete examples of using the library:
 
 - `examples/upscale/main.go` - Basic upscaling example with various options
+- `examples/middleware/main.go` - Example using middleware for logging, rate limiting, and retries
+- `examples/proxy-server/main.go` - Example REST API server that proxies requests to Stability AI
 
-## WebAssembly (WASM) and Cloudflare Workers
-
-The library includes support for WebAssembly compilation with TinyGo, which allows you to run the code in environments like Cloudflare Workers.
-
-### Quick Start with Cloudflare Workers
-
-```bash
-# Navigate to the cloudflare directory
-cd cloudflare
-
-# Build the WASM binary
-make build
-
-# Deploy to Cloudflare Workers
-make deploy
-```
-
-See the [Cloudflare Worker README](cloudflare/README.md) for more details.
-
-### Benefits of Using WASM on Cloudflare Workers
-
-- **API Key Security**: Hide your Stability API key behind the Cloudflare Worker
-- **Custom Rate Limiting**: Control access to the API from a centralized location
-- **Caching**: Reduce costs by caching responses
-- **Global Distribution**: Take advantage of Cloudflare's global network
-- **Zero Infrastructure**: Serverless deployment with no infrastructure to manage
 
 ## Contributing
 
