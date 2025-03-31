@@ -1,0 +1,26 @@
+# Binaries and build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+bin/
+
+# Dependencies
+vendor/
+
+# Environment files
+.env
+*.env
+
+# Output folder
+output/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
