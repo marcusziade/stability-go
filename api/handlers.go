@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -79,7 +80,7 @@ func New(client *client.Client, logger *logger.Logger, cachePath string, rateLim
 
 	// Create cache directory if it doesn't exist
 	if cachePath != "" {
-		if err := os.MkdirAll(cachePath, 0755); err != nil {
+		if err := os.MkdirAll(cachePath, 0o755); err != nil {
 			logger.Error("Failed to create cache directory: %v", err)
 		} else {
 			logger.Info("Cache enabled at %s", cachePath)
@@ -300,7 +301,7 @@ func (s *Server) handleUpscale(w http.ResponseWriter, r *http.Request) {
 	// Cache response if enabled
 	if s.CachePath != "" {
 		cachePath := filepath.Join(s.CachePath, cacheKey+".json")
-		if err := os.WriteFile(cachePath, responseData, 0644); err != nil {
+		if err := os.WriteFile(cachePath, responseData, 0o644); err != nil {
 			s.Logger.Error("Failed to write cache file: %v", err)
 		} else {
 			s.Logger.Info("Cached response at %s", cachePath)
@@ -667,7 +668,7 @@ func generateCacheKey(imageData []byte, formData map[string][]string) string {
 
 // encodeBase64 encodes data as base64
 func encodeBase64(data []byte) string {
-	return hex.EncodeToString(data)
+	return base64.StdEncoding.EncodeToString(data)
 }
 
 // handleRoot serves the landing page with API documentation
@@ -682,7 +683,7 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" {
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
-		
+
 		html := `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -829,11 +830,12 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
     <p><a href="https://github.com/marcusziade/stability-go" target="_blank">https://github.com/marcusziade/stability-go</a></p>
 </body>
 </html>`
-		
+
 		w.Write([]byte(html))
 		return
 	}
-	
+
 	// Otherwise return 404
 	s.sendError(w, "Not found", http.StatusNotFound)
 }
+
