@@ -46,6 +46,13 @@ type UpscaleResponse struct {
 	Pending bool   `json:"pending,omitempty"`
 }
 
+// VideoResponse is the response format for the image-to-video endpoint
+type VideoResponse struct {
+	ID      string `json:"id,omitempty"`
+	Video   string `json:"video,omitempty"`
+	Pending bool   `json:"pending,omitempty"`
+}
+
 // New creates a new API server
 func New(client *client.Client, logger *logger.Logger, cachePath string, rateLimit time.Duration, apiKey string, clientAPIKey string, allowedHosts []string, allowedIPs []string, allowedAppIDs []string) *Server {
 	s := &Server{
@@ -67,6 +74,8 @@ func New(client *client.Client, logger *logger.Logger, cachePath string, rateLim
 	mux.Handle("/", http.HandlerFunc(s.handleRoot))
 	mux.Handle("/api/v1/upscale", WithAuth(clientAPIKey, nil)(http.HandlerFunc(s.handleUpscale)))
 	mux.Handle("/api/v1/upscale/result/", WithAuth(clientAPIKey, nil)(http.HandlerFunc(s.handleUpscaleResult)))
+	mux.Handle("/api/v1/image-to-video", WithAuth(clientAPIKey, nil)(http.HandlerFunc(s.handleImageToVideo)))
+	mux.Handle("/api/v1/image-to-video/result/", WithAuth(clientAPIKey, nil)(http.HandlerFunc(s.handleVideoResult)))
 	mux.Handle("/health", http.HandlerFunc(s.handleHealthCheck))
 	mux.Handle("/api/docs", http.HandlerFunc(s.handleDocs))
 
@@ -393,9 +402,9 @@ func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) {
 	docs := map[string]interface{}{
 		"openapi": "3.0.0",
 		"info": map[string]interface{}{
-			"title":       "Stability AI Upscale API",
-			"description": "API for upscaling images using Stability AI",
-			"version":     "1.0.0",
+			"title":       "Stability AI SDK API",
+			"description": "API for upscaling images and generating videos using Stability AI",
+			"version":     "1.1.0",
 		},
 		"paths": map[string]interface{}{
 			"/api/v1/upscale": map[string]interface{}{
@@ -671,6 +680,277 @@ func encodeBase64(data []byte) string {
 	return base64.StdEncoding.EncodeToString(data)
 }
 
+// handleImageToVideo handles image-to-video requests
+func (s *Server) handleImageToVideo(w http.ResponseWriter, r *http.Request) {
+	// Only allow POST requests
+	if r.Method != http.MethodPost {
+		s.sendError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse multipart form
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		s.sendError(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	// Get image file
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		s.sendError(w, "Failed to get image file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// Read image data
+	imageData, err := io.ReadAll(file)
+	if err != nil {
+		s.sendError(w, "Failed to read image data", http.StatusInternalServerError)
+		return
+	}
+
+	// Generate cache key
+	cacheKey := generateCacheKey(imageData, r.Form)
+
+	// Check cache if enabled
+	if s.CachePath != "" {
+		cachePath := filepath.Join(s.CachePath, cacheKey+".json")
+
+		// Check if cache file exists
+		if _, err := os.Stat(cachePath); err == nil {
+			s.Logger.Info("Cache hit for %s", cacheKey)
+
+			// Read cache file
+			cacheData, err := os.ReadFile(cachePath)
+			if err == nil {
+				// Return cached response
+				w.Header().Set("Content-Type", "application/json")
+				w.Header().Set("X-Cache", "HIT")
+				w.WriteHeader(http.StatusOK)
+				w.Write(cacheData)
+				return
+			}
+		}
+	}
+
+	// Get required parameters
+	motion := r.FormValue("motion")
+	if motion == "" {
+		s.sendError(w, "Motion is required", http.StatusBadRequest)
+		return
+	}
+
+	// Map motion to enum
+	var motionEnum client.VideoMotion
+	switch motion {
+	case "none":
+		motionEnum = client.VideoMotionNone
+	case "zoom":
+		motionEnum = client.VideoMotionZoom
+	case "pan":
+		motionEnum = client.VideoMotionPan
+	case "tilt":
+		motionEnum = client.VideoMotionTilt
+	case "rotate":
+		motionEnum = client.VideoMotionRotate
+	case "zoom_out":
+		motionEnum = client.VideoMotionZoomOut
+	case "pan_left":
+		motionEnum = client.VideoMotionPanLeft
+	case "pan_right":
+		motionEnum = client.VideoMotionPanRight
+	case "tilt_up":
+		motionEnum = client.VideoMotionTiltUp
+	case "tilt_down":
+		motionEnum = client.VideoMotionTiltDown
+	case "rotate_left":
+		motionEnum = client.VideoMotionRotateLeft
+	case "rotate_right":
+		motionEnum = client.VideoMotionRotateRight
+	default:
+		s.sendError(w, "Invalid motion type", http.StatusBadRequest)
+		return
+	}
+
+	// Get required duration
+	durationStr := r.FormValue("duration")
+	if durationStr == "" {
+		s.sendError(w, "Duration is required", http.StatusBadRequest)
+		return
+	}
+
+	duration, err := strconv.ParseFloat(durationStr, 64)
+	if err != nil || duration < 0.5 || duration > 8.0 {
+		s.sendError(w, "Duration must be between 0.5 and 8.0 seconds", http.StatusBadRequest)
+		return
+	}
+
+	// Get required fps
+	fpsStr := r.FormValue("fps")
+	if fpsStr == "" {
+		s.sendError(w, "FPS is required", http.StatusBadRequest)
+		return
+	}
+
+	fps, err := strconv.Atoi(fpsStr)
+	if err != nil || fps < 1 || fps > 60 {
+		s.sendError(w, "FPS must be between 1 and 60", http.StatusBadRequest)
+		return
+	}
+
+	// Get optional parameters
+	prompt := r.FormValue("prompt")
+	negativePrompt := r.FormValue("negative_prompt")
+	seed, _ := strconv.ParseInt(r.FormValue("seed"), 10, 64)
+	cfgScaleStr := r.FormValue("cfg_scale")
+	var cfgScale float64
+	if cfgScaleStr != "" {
+		cfgScale, _ = strconv.ParseFloat(cfgScaleStr, 64)
+		if cfgScale < 0 || cfgScale > 1.0 {
+			s.sendError(w, "CFG scale must be between 0.0 and 1.0", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Get resolution
+	resolution := r.FormValue("resolution")
+	var resolutionEnum client.VideoResolution
+	switch resolution {
+	case "512x512":
+		resolutionEnum = client.VideoResolution512x512
+	case "768x768":
+		resolutionEnum = client.VideoResolution768x768
+	case "1024x576":
+		resolutionEnum = client.VideoResolution1024x576
+	case "576x1024":
+		resolutionEnum = client.VideoResolution576x1024
+	default:
+		// Default to 512x512 if not specified or invalid
+		resolutionEnum = client.VideoResolution512x512
+	}
+
+	// Get output format
+	outputFormat := r.FormValue("output_format")
+	var outputFormatEnum client.VideoFormat
+	switch outputFormat {
+	case "mp4":
+		outputFormatEnum = client.VideoFormatMP4
+	case "gif":
+		outputFormatEnum = client.VideoFormatGIF
+	case "webm":
+		outputFormatEnum = client.VideoFormatWEBM
+	default:
+		// Default to mp4 if not specified or invalid
+		outputFormatEnum = client.VideoFormatMP4
+	}
+
+	// Create image-to-video request
+	request := client.ImageToVideoRequest{
+		Image:          imageData,
+		Filename:       header.Filename,
+		Motion:         motionEnum,
+		Prompt:         prompt,
+		NegativePrompt: negativePrompt,
+		Seed:           seed,
+		Duration:       duration,
+		FPS:            fps,
+		Resolution:     resolutionEnum,
+		OutputFormat:   outputFormatEnum,
+		CFGScale:       cfgScale,
+		ReturnAsJSON:   true,
+	}
+
+	// Send request to Stability AI
+	s.Logger.Info("Sending image-to-video request to Stability AI (motion: %s)", motion)
+	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second) // Longer timeout for video
+	defer cancel()
+
+	response, err := s.Client.ImageToVideo(ctx, request)
+	if err != nil {
+		s.Logger.Error("Error from Stability AI: %v", err)
+		s.sendError(w, fmt.Sprintf("Error from Stability AI: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Prepare response
+	videoResp := VideoResponse{
+		ID:      response.ID,
+		Pending: true,
+	}
+
+	apiResp := Response{
+		Success: true,
+		Data:    videoResp,
+	}
+
+	// Convert response to JSON
+	responseData, err := json.Marshal(apiResp)
+	if err != nil {
+		s.sendError(w, "Failed to marshal response", http.StatusInternalServerError)
+		return
+	}
+
+	// Cache response if enabled
+	if s.CachePath != "" {
+		cachePath := filepath.Join(s.CachePath, cacheKey+".json")
+		if err := os.WriteFile(cachePath, responseData, 0o644); err != nil {
+			s.Logger.Error("Failed to write cache file: %v", err)
+		} else {
+			s.Logger.Info("Cached response at %s", cachePath)
+		}
+	}
+
+	// Send response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(responseData)
+}
+
+// handleVideoResult handles polling for image-to-video results
+func (s *Server) handleVideoResult(w http.ResponseWriter, r *http.Request) {
+	// Only allow GET requests
+	if r.Method != http.MethodGet {
+		s.sendError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get video ID from URL
+	id := filepath.Base(r.URL.Path)
+	if id == "" {
+		s.sendError(w, "Missing video ID", http.StatusBadRequest)
+		return
+	}
+
+	// Poll for the result
+	s.Logger.Info("Polling for image-to-video result (ID: %s)", id)
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+
+	result, finished, err := s.Client.PollVideoResult(ctx, id)
+	if err != nil {
+		s.Logger.Error("Error polling for image-to-video result: %v", err)
+		s.sendError(w, fmt.Sprintf("Error polling for image-to-video result: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Prepare response
+	videoResp := VideoResponse{
+		ID:      id,
+		Pending: !finished,
+	}
+
+	// If the video generation is finished, include the video data
+	if finished {
+		videoResp.Video = "data:" + result.MimeType + ";base64," + encodeBase64(result.VideoData)
+	}
+
+	// Send response
+	s.sendJSON(w, Response{
+		Success: true,
+		Data:    videoResp,
+	})
+}
+
 // handleRoot serves the landing page with API documentation
 func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 	// Only allow GET requests
@@ -742,8 +1022,8 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
     </style>
 </head>
 <body>
-    <h1>Stability AI Upscale API</h1>
-    <p>A REST API service for upscaling images using Stability AI's API.</p>
+    <h1>Stability AI SDK API</h1>
+    <p>A REST API service for upscaling images and generating videos using Stability AI's APIs.</p>
     
     <h2>API Endpoints</h2>
     
@@ -777,6 +1057,39 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
         </h4>
         <p>Poll for the result of a creative upscale request.</p>
         <p>Replace <code>{id}</code> with the ID returned from a creative upscale request.</p>
+    </div>
+    
+    <div class="endpoint">
+        <h4>
+            <span class="method post">POST</span>
+            <span class="url">/api/v1/image-to-video</span>
+        </h4>
+        <p>Generate a video from an image using Stability AI's image-to-video API.</p>
+        <p>Required parameters:</p>
+        <ul>
+            <li><code>image</code>: The image file to use as the base for video generation (multipart/form-data)</li>
+            <li><code>motion</code>: The motion type to apply (e.g., "zoom", "pan", "rotate", "zoom_out", "pan_left", etc.)</li>
+            <li><code>duration</code>: The duration of the video in seconds (0.5-8.0)</li>
+            <li><code>fps</code>: Frames per second (1-60)</li>
+        </ul>
+        <p>Optional parameters:</p>
+        <ul>
+            <li><code>prompt</code>: Text prompt to guide video generation</li>
+            <li><code>negative_prompt</code>: Negative prompt to guide video generation</li>
+            <li><code>seed</code>: Seed for consistent results</li>
+            <li><code>cfg_scale</code>: Creativity level (0.0-1.0)</li>
+            <li><code>resolution</code>: Video resolution - "512x512", "768x768", "1024x576", or "576x1024" (default: "512x512")</li>
+            <li><code>output_format</code>: Output format - "mp4", "gif", or "webm" (default: "mp4")</li>
+        </ul>
+    </div>
+    
+    <div class="endpoint">
+        <h4>
+            <span class="method get">GET</span>
+            <span class="url">/api/v1/image-to-video/result/{id}</span>
+        </h4>
+        <p>Poll for the result of a video generation request.</p>
+        <p>Replace <code>{id}</code> with the ID returned from an image-to-video request.</p>
     </div>
     
     <div class="endpoint">

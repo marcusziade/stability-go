@@ -1,6 +1,6 @@
 # Stability Go Client
 
-A production-ready Go client library and REST API server for the Stability AI API, with a focus on the Upscale services. The library provides a clean, idiomatic Go interface to the Stability AI API with middleware support for rate limiting, retries, and proxying.
+A production-ready Go client library and REST API server for the Stability AI API, with support for Upscale and Image-to-Video services. The library provides a clean, idiomatic Go interface to the Stability AI API with middleware support for rate limiting, retries, and proxying.
 
 ## Hosted API
 
@@ -12,6 +12,7 @@ Visit the hosted API for documentation and examples on how to interact with the 
 ## Features
 
 - Full support for Stability AI's upscale API endpoints
+- Support for Stability AI's image-to-video API endpoints
 - Middleware-based architecture for customizable request handling
 - Rate limiting middleware to avoid API rate limit errors
 - Retry middleware with exponential backoff and jitter
@@ -27,6 +28,8 @@ go get github.com/marcusziade/stability-go
 ```
 
 ## Quick Start
+
+### Upscaling Example
 
 ```go
 package main
@@ -87,6 +90,83 @@ func main() {
 }
 ```
 
+### Image-to-Video Example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "os"
+    "time"
+
+    "github.com/marcusziade/stability-go"
+    "github.com/marcusziade/stability-go/client"
+)
+
+func main() {
+    // Create a new client with your API key
+    apiKey := os.Getenv("STABILITY_API_KEY")
+    if apiKey == "" {
+        fmt.Println("STABILITY_API_KEY environment variable is required")
+        os.Exit(1)
+    }
+
+    // Create a simple client
+    stClient := stability.New(apiKey)
+
+    // Read image data
+    imageData, err := os.ReadFile("input.jpg")
+    if err != nil {
+        fmt.Printf("Failed to read image: %v\n", err)
+        os.Exit(1)
+    }
+
+    // Create image-to-video request
+    request := client.ImageToVideoRequest{
+        Image:        imageData,
+        Filename:     "input.jpg",
+        Motion:       client.VideoMotionZoom,
+        Duration:     3.0,
+        FPS:          30,
+        Resolution:   client.VideoResolution512x512,
+        OutputFormat: client.VideoFormatMP4,
+        Prompt:       "Cinematic scene with dramatic lighting",
+        CFGScale:     0.5,
+    }
+
+    // Make the request (with longer timeout for video generation)
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+    defer cancel()
+
+    response, err := stClient.ImageToVideo(ctx, request)
+    if err != nil {
+        fmt.Printf("Failed to initiate video generation: %v\n", err)
+        os.Exit(1)
+    }
+
+    // Poll for the video result
+    fmt.Println("Video generation initiated with ID:", response.ID)
+    fmt.Println("Polling for result...")
+
+    // Poll until the video is ready (or context times out)
+    videoResult, err := stClient.WaitForVideoResult(ctx, response.ID, 5*time.Second)
+    if err != nil {
+        fmt.Printf("Error polling for video result: %v\n", err)
+        os.Exit(1)
+    }
+
+    // Save the video
+    if err := os.WriteFile("output.mp4", videoResult.VideoData, 0644); err != nil {
+        fmt.Printf("Failed to save video: %v\n", err)
+        os.Exit(1)
+    }
+
+    fmt.Println("Successfully generated and saved video to output.mp4")
+}
+```
+
 ## Advanced Usage with Middleware
 
 ```go
@@ -140,7 +220,10 @@ if err != nil {
 See the `examples` directory for complete examples of using the library:
 
 - `examples/upscale/main.go` - Basic upscaling example with various options
+- `examples/image-to-video/main.go` - Example for generating videos from images
 - `examples/middleware/main.go` - Example using middleware for logging, rate limiting, and retries
+- `examples/mini-client/main.go` - Mini client for using the upscale API via HTTP
+- `examples/mini-client-video/main.go` - Mini client for using the image-to-video API via HTTP
 - `examples/proxy-server/main.go` - Example REST API server that proxies requests to Stability AI
 
 ## Using the REST API Server
@@ -200,6 +283,8 @@ The REST API server provides the following endpoints:
 - `GET /` - Landing page with API overview and documentation
 - `POST /api/v1/upscale` - Upscale an image
 - `GET /api/v1/upscale/result/{id}` - Get the result of a creative upscale
+- `POST /api/v1/image-to-video` - Generate a video from an image
+- `GET /api/v1/image-to-video/result/{id}` - Get the result of a video generation
 - `GET /health` - Health check endpoint
 - `GET /api/docs` - API documentation (OpenAPI format)
 
