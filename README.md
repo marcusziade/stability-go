@@ -24,7 +24,7 @@ Visit the hosted API for documentation and examples on how to interact with the 
 ## Installation
 
 ```bash
-go get github.com/marcusziade/stability-go
+go get github.com/guitaripod/stability-go
 ```
 
 ## Quick Start
@@ -40,8 +40,8 @@ import (
     "os"
     "time"
 
-    "github.com/marcusziade/stability-go"
-    "github.com/marcusziade/stability-go/client"
+    "github.com/guitaripod/stability-go"
+    "github.com/guitaripod/stability-go/client"
 )
 
 func main() {
@@ -101,8 +101,8 @@ import (
     "os"
     "time"
 
-    "github.com/marcusziade/stability-go"
-    "github.com/marcusziade/stability-go/client"
+    "github.com/guitaripod/stability-go"
+    "github.com/guitaripod/stability-go/client"
 )
 
 func main() {
@@ -246,7 +246,7 @@ fly deploy
 
 ```bash
 # Clone the repository
-git clone https://github.com/marcusziade/stability-go.git
+git clone https://github.com/guitaripod/stability-go.git
 cd stability-go
 
 # Set your Stability AI API key
@@ -260,7 +260,7 @@ docker-compose up -d
 
 ```bash
 # Clone the repository
-git clone https://github.com/marcusziade/stability-go.git
+git clone https://github.com/guitaripod/stability-go.git
 cd stability-go
 
 # Build the server
