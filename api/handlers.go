@@ -60,25 +60,21 @@ func New(client *client.Client, logger *logger.Logger, cachePath string, rateLim
 		AllowedAppIDs: allowedAppIDs,
 	}
 
-	// Create the router
 	mux := http.NewServeMux()
 
-	// Register routes with middleware
 	mux.Handle("/", http.HandlerFunc(s.handleRoot))
 	mux.Handle("/api/v1/upscale", WithAuth(clientAPIKey, nil)(http.HandlerFunc(s.handleUpscale)))
 	mux.Handle("/api/v1/upscale/result/", WithAuth(clientAPIKey, nil)(http.HandlerFunc(s.handleUpscaleResult)))
 	mux.Handle("/health", http.HandlerFunc(s.handleHealthCheck))
 	mux.Handle("/api/docs", http.HandlerFunc(s.handleDocs))
 
-	// Apply global middleware
 	s.Router = Chain(
 		WithLogger(logger),
-		WithCORS(nil), // Allow all origins
+		WithCORS(nil),
 		WithIPFilter(s.AllowedIPs),
 		WithAppIDAuth(s.AllowedAppIDs),
 	)(mux)
 
-	// Create cache directory if it doesn't exist
 	if cachePath != "" {
 		if err := os.MkdirAll(cachePath, 0o755); err != nil {
 			logger.Error("Failed to create cache directory: %v", err)
@@ -98,25 +94,21 @@ func (s *Server) Start(addr string) error {
 
 // handleUpscale handles upscale requests
 func (s *Server) handleUpscale(w http.ResponseWriter, r *http.Request) {
-	// Only allow POST requests
 	if r.Method != http.MethodPost {
 		s.sendError(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Parse multipart form
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		s.sendError(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}
 
-	// Get upscale type
 	upscaleType := r.FormValue("type")
 	if upscaleType == "" {
-		upscaleType = "fast" // Default to fast upscaling
+		upscaleType = "fast"
 	}
 
-	// Map upscale type to enum
 	var upscaleTypeEnum client.UpscaleType
 	switch upscaleType {
 	case "fast":
@@ -130,14 +122,12 @@ func (s *Server) handleUpscale(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if prompt is provided for conservative and creative types
 	prompt := r.FormValue("prompt")
 	if (upscaleTypeEnum == client.UpscaleTypeConservative || upscaleTypeEnum == client.UpscaleTypeCreative) && prompt == "" {
 		s.sendError(w, "Prompt is required for conservative and creative upscale types", http.StatusBadRequest)
 		return
 	}
 
-	// Get image file
 	file, header, err := r.FormFile("image")
 	if err != nil {
 		s.sendError(w, "Failed to get image file", http.StatusBadRequest)
@@ -145,28 +135,22 @@ func (s *Server) handleUpscale(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Read image data
 	imageData, err := io.ReadAll(file)
 	if err != nil {
 		s.sendError(w, "Failed to read image data", http.StatusInternalServerError)
 		return
 	}
 
-	// Generate cache key
 	cacheKey := generateCacheKey(imageData, r.Form)
 
-	// Check cache if enabled
 	if s.CachePath != "" {
 		cachePath := filepath.Join(s.CachePath, cacheKey+".json")
 
-		// Check if cache file exists
 		if _, err := os.Stat(cachePath); err == nil {
 			s.Logger.Info("Cache hit for %s", cacheKey)
 
-			// Read cache file
 			cacheData, err := os.ReadFile(cachePath)
 			if err == nil {
-				// Return cached response
 				w.Header().Set("Content-Type", "application/json")
 				w.Header().Set("X-Cache", "HIT")
 				w.WriteHeader(http.StatusOK)
@@ -176,7 +160,6 @@ func (s *Server) handleUpscale(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Get optional parameters
 	negativePrompt := r.FormValue("negative_prompt")
 	seed, _ := strconv.ParseInt(r.FormValue("seed"), 10, 64)
 	creativityStr := r.FormValue("creativity")
@@ -185,7 +168,6 @@ func (s *Server) handleUpscale(w http.ResponseWriter, r *http.Request) {
 		creativity, _ = strconv.ParseFloat(creativityStr, 64)
 	}
 
-	// Get output format
 	outputFormat := r.FormValue("output_format")
 	var outputFormatEnum client.OutputFormat
 	switch outputFormat {
@@ -197,7 +179,6 @@ func (s *Server) handleUpscale(w http.ResponseWriter, r *http.Request) {
 		outputFormatEnum = client.OutputFormatPNG // Default to PNG
 	}
 
-	// Get style preset for creative upscale
 	stylePreset := r.FormValue("style_preset")
 	var stylePresetEnum client.StylePreset
 	if stylePreset != "" {
@@ -242,7 +223,6 @@ func (s *Server) handleUpscale(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Create upscale request
 	request := client.UpscaleRequest{
 		Image:          imageData,
 		Filename:       header.Filename,
@@ -256,7 +236,6 @@ func (s *Server) handleUpscale(w http.ResponseWriter, r *http.Request) {
 		ReturnAsJSON:   true,
 	}
 
-	// Send request to Stability AI
 	s.Logger.Info("Sending upscale request to Stability AI (type: %s)", upscaleType)
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
@@ -268,19 +247,15 @@ func (s *Server) handleUpscale(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Prepare response
 	var apiResp Response
 	var upscaleResp UpscaleResponse
 
 	if upscaleTypeEnum == client.UpscaleTypeCreative {
-		// For creative upscale, we get an ID for polling
 		upscaleResp = UpscaleResponse{
 			ID:      response.CreativeID,
 			Pending: true,
 		}
 	} else {
-		// For fast and conservative upscale, we get the image directly
-		// Base64 encode the image for JSON response
 		upscaleResp = UpscaleResponse{
 			Image: "data:" + response.MimeType + ";base64," + encodeBase64(response.ImageData),
 		}
@@ -291,14 +266,12 @@ func (s *Server) handleUpscale(w http.ResponseWriter, r *http.Request) {
 		Data:    upscaleResp,
 	}
 
-	// Convert response to JSON
 	responseData, err := json.Marshal(apiResp)
 	if err != nil {
 		s.sendError(w, "Failed to marshal response", http.StatusInternalServerError)
 		return
 	}
 
-	// Cache response if enabled
 	if s.CachePath != "" {
 		cachePath := filepath.Join(s.CachePath, cacheKey+".json")
 		if err := os.WriteFile(cachePath, responseData, 0o644); err != nil {
@@ -308,7 +281,6 @@ func (s *Server) handleUpscale(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Send response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(responseData)
@@ -316,20 +288,17 @@ func (s *Server) handleUpscale(w http.ResponseWriter, r *http.Request) {
 
 // handleUpscaleResult handles polling for creative upscale results
 func (s *Server) handleUpscaleResult(w http.ResponseWriter, r *http.Request) {
-	// Only allow GET requests
 	if r.Method != http.MethodGet {
 		s.sendError(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Get creative ID from URL
 	id := filepath.Base(r.URL.Path)
 	if id == "" {
 		s.sendError(w, "Missing creative ID", http.StatusBadRequest)
 		return
 	}
 
-	// Poll for the result
 	s.Logger.Info("Polling for creative upscale result (ID: %s)", id)
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
@@ -341,13 +310,11 @@ func (s *Server) handleUpscaleResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Prepare response
 	upscaleResp := UpscaleResponse{
 		ID:      id,
 		Pending: !finished,
 	}
 
-	// If the upscale is finished, include the image data
 	if finished {
 		upscaleResp.Image = "data:" + result.MimeType + ";base64," + encodeBase64(result.ImageData)
 	}
@@ -361,20 +328,17 @@ func (s *Server) handleUpscaleResult(w http.ResponseWriter, r *http.Request) {
 
 // handleHealthCheck handles health check requests
 func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
-	// Only allow GET requests
 	if r.Method != http.MethodGet {
 		s.sendError(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Perform a simple API check
 	info := map[string]interface{}{
 		"status":  "ok",
 		"version": "1.0.0",
 		"uptime":  "up",
 	}
 
-	// Send response
 	s.sendJSON(w, Response{
 		Success: true,
 		Data:    info,
@@ -383,13 +347,11 @@ func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 
 // handleDocs serves the API documentation
 func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) {
-	// Only allow GET requests
 	if r.Method != http.MethodGet {
 		s.sendError(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Define API documentation
 	docs := map[string]interface{}{
 		"openapi": "3.0.0",
 		"info": map[string]interface{}{
@@ -627,11 +589,8 @@ func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	// Send response
 	s.sendJSON(w, docs)
 }
-
-// Helper functions
 
 // sendError sends an error response
 func (s *Server) sendError(w http.ResponseWriter, message string, statusCode int) {
@@ -673,13 +632,11 @@ func encodeBase64(data []byte) string {
 
 // handleRoot serves the landing page with API documentation
 func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
-	// Only allow GET requests
 	if r.Method != http.MethodGet {
 		s.sendError(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// If requesting the root path exactly, serve HTML
 	if r.URL.Path == "/" {
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
@@ -835,7 +792,5 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Otherwise return 404
 	s.sendError(w, "Not found", http.StatusNotFound)
 }
-
